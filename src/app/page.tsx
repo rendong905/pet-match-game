@@ -4,6 +4,15 @@ import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { levels, type Level, getLevel } from '@/lib/levels';
+import {
+  GameProgress,
+  defaultProgress,
+  saveProgress,
+  loadProgress,
+  isLevelUnlocked,
+  getHighScore,
+  updateHighScore,
+} from '@/lib/gameProgress';
 
 // 小狗类型
 type DogType = 'puppy' | 'dog' | 'poodle' | 'bone' | 'paw' | 'fox';
@@ -44,6 +53,13 @@ export default function MatchThreeGame() {
   const [score, setScore] = useState(0);
   const [moves, setMoves] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [progress, setProgress] = useState<GameProgress>(defaultProgress);
+
+  // 页面加载时恢复进度
+  useEffect(() => {
+    const savedProgress = loadProgress();
+    setProgress(savedProgress);
+  }, []);
 
   // 初始化游戏网格
   const initializeGrid = useCallback(() => {
@@ -63,6 +79,15 @@ export default function MatchThreeGame() {
 
   // 开始指定关卡
   const startLevel = (level: Level) => {
+    // 增加游戏次数
+    const newProgress = {
+      ...progress,
+      currentLevel: level.id,
+      playCount: progress.playCount + 1,
+    };
+    saveProgress(newProgress);
+    setProgress(newProgress);
+
     setCurrentLevel(level);
     setGrid(initializeGrid());
     setScore(0);
@@ -82,7 +107,19 @@ export default function MatchThreeGame() {
   // 下一关
   const nextLevel = () => {
     if (currentLevel) {
-      const nextLevelData = getLevel(currentLevel.id + 1);
+      // 保存当前关卡分数并解锁下一关
+      const updatedProgress = updateHighScore(currentLevel.id, score, progress);
+
+      // 解锁下一关
+      const nextLevelId = currentLevel.id + 1;
+      if (nextLevelId <= levels.length) {
+        updatedProgress.unlockedLevel = Math.max(updatedProgress.unlockedLevel, nextLevelId);
+      }
+
+      saveProgress(updatedProgress);
+      setProgress(updatedProgress);
+
+      const nextLevelData = getLevel(nextLevelId);
       if (nextLevelData) {
         startLevel(nextLevelData);
       } else {
@@ -101,11 +138,19 @@ export default function MatchThreeGame() {
     if (!currentLevel || gameState !== 'playing') return;
 
     if (score >= currentLevel.targetScore) {
+      // 胜利：保存分数
+      const updatedProgress = updateHighScore(currentLevel.id, score, progress);
+      saveProgress(updatedProgress);
+      setProgress(updatedProgress);
       setGameState('won');
     } else if (moves >= currentLevel.maxMoves) {
+      // 失败：保存当前状态
+      const updatedProgress = updateHighScore(currentLevel.id, score, progress);
+      saveProgress(updatedProgress);
+      setProgress(updatedProgress);
       setGameState('lost');
     }
-  }, [currentLevel, score, moves, gameState]);
+  }, [currentLevel, score, moves, gameState, progress]);
 
   // 检查放置小狗是否会创建初始匹配
   const wouldCreateMatch = (
@@ -261,17 +306,35 @@ export default function MatchThreeGame() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-              {levels.map((level) => (
-                <Button
-                  key={level.id}
-                  onClick={() => startLevel(level)}
-                  className="h-24 flex flex-col items-center justify-center bg-gradient-to-br from-orange-100 to-amber-100 hover:from-orange-200 hover:to-amber-200 text-orange-700 border-2 border-orange-300 hover:border-orange-400 transition-all duration-200"
-                >
-                  <span className="text-2xl mb-1">🐾</span>
-                  <span className="text-lg font-bold">第 {level.id} 关</span>
-                  <span className="text-xs text-orange-600 mt-1">{level.targetScore}分</span>
-                </Button>
-              ))}
+              {levels.map((level) => {
+                const unlocked = isLevelUnlocked(level.id, progress);
+                const highScore = getHighScore(level.id, progress);
+
+                return (
+                  <Button
+                    key={level.id}
+                    onClick={() => unlocked && startLevel(level)}
+                    disabled={!unlocked}
+                    className={`h-24 flex flex-col items-center justify-center border-2 transition-all duration-200 ${
+                      unlocked
+                        ? 'bg-gradient-to-br from-orange-100 to-amber-100 hover:from-orange-200 hover:to-amber-200 text-orange-700 border-orange-300 hover:border-orange-400 cursor-pointer'
+                        : 'bg-gray-100 text-gray-400 border-gray-300 cursor-not-allowed'
+                    }`}
+                  >
+                    <span className="text-2xl mb-1">{unlocked ? '🐾' : '🔒'}</span>
+                    <span className="text-lg font-bold">第 {level.id} 关</span>
+                    <span className="text-xs text-orange-600 mt-1">{level.targetScore}分</span>
+                    {highScore > 0 && (
+                      <span className="text-xs text-orange-500 mt-1">最高: {highScore}</span>
+                    )}
+                    {!unlocked && (
+                      <span className="text-xs text-gray-400 mt-1">
+                        通关第{level.id - 1}关解锁
+                      </span>
+                    )}
+                  </Button>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
@@ -290,7 +353,7 @@ export default function MatchThreeGame() {
           <div className="text-lg text-orange-700 font-semibold mb-3">
             {currentLevel?.name}
           </div>
-          <div className="flex items-center justify-center gap-6">
+          <div className="flex items-center justify-center gap-6 mb-2">
             <div className="text-xl text-orange-700">
               得分: <span className="font-bold text-orange-500">{score}</span>
               <span className="text-sm text-orange-600 ml-2">/ {currentLevel?.targetScore}</span>
@@ -300,6 +363,11 @@ export default function MatchThreeGame() {
               <span className="text-sm text-orange-600 ml-2">/ {currentLevel?.maxMoves}</span>
             </div>
           </div>
+          {currentLevel && (
+            <div className="text-sm text-orange-600 mb-3">
+              历史最高: <span className="font-bold text-orange-500">{getHighScore(currentLevel.id, progress)}</span>
+            </div>
+          )}
           <div className="flex items-center justify-center gap-4 mt-3">
             <Button
               onClick={backToMenu}
