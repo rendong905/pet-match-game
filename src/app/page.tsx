@@ -48,7 +48,6 @@ export default function MatchThreeGame() {
   const [hintGems, setHintGems] = useState<Hint | null>(null); // 当前提示的格子
   const [isWeChat, setIsWeChat] = useState(false); // 是否在微信浏览器中
   const [targetReached, setTargetReached] = useState(false); // 是否已达到目标分数
-  const [isAutoPlaying, setIsAutoPlaying] = useState(false); // 是否正在自动消除
 
   // 检测微信浏览器
   useEffect(() => {
@@ -191,51 +190,6 @@ export default function MatchThreeGame() {
       }
     }
   }, [currentLevel, score, moves, gameState, progress, targetReached]);
-
-  // 自动消除逻辑（达到目标后自动继续消除）
-  useEffect(() => {
-    const autoPlay = async () => {
-      if (!currentLevel || gameState !== 'playing' || !targetReached || isAutoPlaying || isProcessing || moves >= currentLevel.maxMoves) {
-        return;
-      }
-
-      setIsAutoPlaying(true);
-
-      while (moves < currentLevel.maxMoves && gameState === 'playing') {
-        // 查找可消除的对
-        const hint = findHint(grid, currentLevel);
-
-        if (!hint) {
-          // 没有可消除的，退出
-          break;
-        }
-
-        // 模拟交换
-        const { gem1, gem2 } = hint;
-        const newGrid = grid.map(r => [...r]);
-        const temp = newGrid[gem1.row][gem1.col];
-        newGrid[gem1.row][gem1.col] = newGrid[gem2.row][gem2.col];
-        newGrid[gem2.row][gem2.col] = temp;
-
-        // 检查是否有匹配
-        const matches = findMatches(newGrid);
-
-        if (matches.size > 0) {
-          setGrid(newGrid);
-          setMoves(prev => prev + 1);
-          await processMatches(newGrid);
-          // 等待一段时间再进行下一次交换
-          await new Promise(resolve => setTimeout(resolve, 500));
-        } else {
-          break;
-        }
-      }
-
-      setIsAutoPlaying(false);
-    };
-
-    autoPlay();
-  }, [targetReached, moves, gameState, currentLevel, isProcessing, isAutoPlaying, grid]);
 
   // 检查放置小狗是否会创建初始匹配
   const wouldCreateMatch = (
