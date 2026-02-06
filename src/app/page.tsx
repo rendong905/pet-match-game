@@ -44,6 +44,7 @@ export default function MatchThreeGame() {
   const [hintsRemaining, setHintsRemaining] = useState(3); // 每关3次提示
   const [hintGems, setHintGems] = useState<Hint | null>(null); // 当前提示的格子
   const [isWeChat, setIsWeChat] = useState(false); // 是否在微信浏览器中
+  const [targetReached, setTargetReached] = useState(false); // 是否已达到目标分数
 
   // 检测微信浏览器
   useEffect(() => {
@@ -77,7 +78,7 @@ export default function MatchThreeGame() {
   }, []);
 
   // 开始指定关卡
-  const startLevel = (level: Level) => {
+  const startLevel = async (level: Level) => {
     // 增加游戏次数
     const newProgress = {
       ...progress,
@@ -88,14 +89,20 @@ export default function MatchThreeGame() {
     setProgress(newProgress);
 
     setCurrentLevel(level);
-    setGrid(initializeGrid(level));
+    const newGrid = initializeGrid(level);
+    setGrid(newGrid);
     setScore(0);
     setMoves(0);
+    setTargetReached(false); // 重置目标达成状态
     setSelectedGem(null);
-    setIsProcessing(false);
+    setIsProcessing(true); // 初始化时标记为处理中
     setHintsRemaining(3); // 重置提示次数
     setHintGems(null); // 清除提示
     setGameState('playing');
+
+    // 处理初始匹配
+    await processMatches(newGrid);
+    setIsProcessing(false);
   };
 
   // 重新开始当前关卡
@@ -160,20 +167,26 @@ export default function MatchThreeGame() {
   const checkGameState = useCallback(() => {
     if (!currentLevel || gameState !== 'playing') return;
 
-    if (score >= currentLevel.targetScore) {
-      // 胜利：保存分数
-      const updatedProgress = updateHighScore(currentLevel.id, score, progress);
-      saveProgress(updatedProgress);
-      setProgress(updatedProgress);
-      setGameState('won');
-    } else if (moves >= currentLevel.maxMoves) {
-      // 失败：保存当前状态
-      const updatedProgress = updateHighScore(currentLevel.id, score, progress);
-      saveProgress(updatedProgress);
-      setProgress(updatedProgress);
-      setGameState('lost');
+    // 检查是否达到目标分数
+    if (score >= currentLevel.targetScore && !targetReached) {
+      setTargetReached(true);
+      // 达到目标分数但不立即结束，让玩家继续消除以获得更高分数
     }
-  }, [currentLevel, score, moves, gameState, progress]);
+
+    // 步数用完时判断胜负
+    if (moves >= currentLevel.maxMoves) {
+      // 保存当前状态
+      const updatedProgress = updateHighScore(currentLevel.id, score, progress);
+      saveProgress(updatedProgress);
+      setProgress(updatedProgress);
+
+      if (score >= currentLevel.targetScore) {
+        setGameState('won');
+      } else {
+        setGameState('lost');
+      }
+    }
+  }, [currentLevel, score, moves, gameState, progress, targetReached]);
 
   // 检查放置小狗是否会创建初始匹配
   const wouldCreateMatch = (
@@ -244,9 +257,13 @@ export default function MatchThreeGame() {
       setIsProcessing(true);
 
       const newGrid = grid.map(r => [...r]);
-      const temp = newGrid[selectedGem.row][selectedGem.col];
-      newGrid[selectedGem.row][selectedGem.col] = newGrid[row][col];
-      newGrid[row][col] = temp;
+      // 保存原始值用于撤销
+      const gem1 = { ...newGrid[selectedGem.row][selectedGem.col] };
+      const gem2 = { ...newGrid[row][col] };
+
+      // 执行交换
+      newGrid[selectedGem.row][selectedGem.col] = gem2;
+      newGrid[row][col] = gem1;
 
       const matches = findMatches(newGrid);
 
@@ -256,9 +273,10 @@ export default function MatchThreeGame() {
         setMoves(prev => prev + 1);
         await processMatches(newGrid);
       } else {
+        // 无效交换，撤销
         await new Promise(resolve => setTimeout(resolve, 200));
-        newGrid[selectedGem.row][selectedGem.col] = newGrid[row][col];
-        newGrid[row][col] = temp;
+        newGrid[selectedGem.row][selectedGem.col] = gem1;
+        newGrid[row][col] = gem2;
         setGrid(newGrid);
         setSelectedGem(null);
       }
@@ -345,20 +363,20 @@ export default function MatchThreeGame() {
                     key={level.id}
                     onClick={() => unlocked && startLevel(level)}
                     disabled={!unlocked}
-                    className={`h-24 flex flex-col items-center justify-center border-2 transition-all duration-200 ${
+                    className={`h-28 flex flex-col items-center justify-center border-2 transition-all duration-200 overflow-hidden ${
                       unlocked
                         ? 'bg-gradient-to-br from-orange-100 to-amber-100 hover:from-orange-200 hover:to-amber-200 text-orange-700 border-orange-300 hover:border-orange-400 cursor-pointer'
                         : 'bg-gray-100 text-gray-400 border-gray-300 cursor-not-allowed'
                     }`}
                   >
-                    <span className="text-2xl mb-1">{unlocked ? '🐾' : '🔒'}</span>
-                    <span className="text-lg font-bold">第 {level.id} 关</span>
-                    <span className="text-xs text-orange-600 mt-1">{level.targetScore}分</span>
+                    <span className="text-3xl mb-1">{unlocked ? '🐾' : '🔒'}</span>
+                    <span className="text-base font-bold">第 {level.id} 关</span>
+                    <span className="text-xs text-orange-600 mt-0.5">{level.targetScore}分</span>
                     {highScore > 0 && (
-                      <span className="text-xs text-orange-500 mt-1">最高: {highScore}</span>
+                      <span className="text-xs text-orange-500 mt-0.5">最高: {highScore}</span>
                     )}
                     {!unlocked && (
-                      <span className="text-xs text-gray-400 mt-1">
+                      <span className="text-xs text-gray-400 mt-0.5">
                         通关第{level.id - 1}关解锁
                       </span>
                     )}
@@ -396,6 +414,11 @@ export default function MatchThreeGame() {
           {currentLevel && (
             <div className="text-sm text-orange-600 mb-3">
               历史最高: <span className="font-bold text-orange-500">{getHighScore(currentLevel.id, progress)}</span>
+            </div>
+          )}
+          {targetReached && (
+            <div className="text-sm bg-green-100 text-green-700 px-3 py-1 rounded-full mb-3 inline-block">
+              🎉 目标已达成！继续消除获得更高分数
             </div>
           )}
           <div className="flex items-center justify-center gap-4 mt-3">
