@@ -48,6 +48,7 @@ export default function MatchThreeGame() {
   const [hintGems, setHintGems] = useState<Hint | null>(null); // 当前提示的格子
   const [isWeChat, setIsWeChat] = useState(false); // 是否在微信浏览器中
   const [targetReached, setTargetReached] = useState(false); // 是否已达到目标分数
+  const [lastRefreshTime, setLastRefreshTime] = useState(0); // 上次刷新时间
 
   // 检测微信浏览器
   useEffect(() => {
@@ -75,6 +76,21 @@ export default function MatchThreeGame() {
           dog = levelDogTypes[Math.floor(Math.random() * levelDogTypes.length)];
         } while (false); // 暂时禁用初始匹配检查，稍后修复
         newGrid[row][col] = createGem(dog);
+      }
+    }
+    return newGrid;
+  }, []);
+
+  // 刷新网格（不重置分数和步数）
+  const refreshGrid = useCallback((level: Level) => {
+    const newGrid: Gem[][] = [];
+    const levelDogTypes = dogTypes.slice(0, level.dogTypes);
+
+    for (let row = 0; row < GRID_SIZE; row++) {
+      newGrid[row] = [];
+      for (let col = 0; col < GRID_SIZE; col++) {
+        const randomType = levelDogTypes[Math.floor(Math.random() * levelDogTypes.length)];
+        newGrid[row][col] = createGem(randomType);
       }
     }
     return newGrid;
@@ -207,29 +223,51 @@ export default function MatchThreeGame() {
     return false;
   };
 
-  // 查找所有匹配
+  // 查找所有匹配（支持3连及以上）
   const findMatches = useCallback((currentGrid: Gem[][]): Set<string> => {
     const matches = new Set<string>();
 
+    // 检测水平匹配（3连及以上）
     for (let row = 0; row < GRID_SIZE; row++) {
-      for (let col = 0; col < GRID_SIZE - 2; col++) {
+      let col = 0;
+      while (col < GRID_SIZE) {
         const gem = currentGrid[row][col];
-        if (gem && gem.type === currentGrid[row][col + 1]?.type && gem.type === currentGrid[row][col + 2]?.type) {
-          matches.add(`${row},${col}`);
-          matches.add(`${row},${col + 1}`);
-          matches.add(`${row},${col + 2}`);
+        if (gem) {
+          let matchCount = 1;
+          while (col + matchCount < GRID_SIZE && currentGrid[row][col + matchCount]?.type === gem.type) {
+            matchCount++;
+          }
+          if (matchCount >= 3) {
+            for (let i = 0; i < matchCount; i++) {
+              matches.add(`${row},${col + i}`);
+            }
+            col += matchCount;
+            continue;
+          }
         }
+        col++;
       }
     }
 
-    for (let row = 0; row < GRID_SIZE - 2; row++) {
-      for (let col = 0; col < GRID_SIZE; col++) {
+    // 检测垂直匹配（3连及以上）
+    for (let col = 0; col < GRID_SIZE; col++) {
+      let row = 0;
+      while (row < GRID_SIZE) {
         const gem = currentGrid[row][col];
-        if (gem && gem.type === currentGrid[row + 1]?.[col]?.type && gem.type === currentGrid[row + 2]?.[col]?.type) {
-          matches.add(`${row},${col}`);
-          matches.add(`${row + 1},${col}`);
-          matches.add(`${row + 2},${col}`);
+        if (gem) {
+          let matchCount = 1;
+          while (row + matchCount < GRID_SIZE && currentGrid[row + matchCount]?.[col]?.type === gem.type) {
+            matchCount++;
+          }
+          if (matchCount >= 3) {
+            for (let i = 0; i < matchCount; i++) {
+              matches.add(`${row + i},${col}`);
+            }
+            row += matchCount;
+            continue;
+          }
         }
+        row++;
       }
     }
 
@@ -377,6 +415,32 @@ export default function MatchThreeGame() {
   useEffect(() => {
     checkGameState();
   }, [checkGameState, score, moves]);
+
+  // 检查死局并刷新（在非处理状态下触发）
+  useEffect(() => {
+    const checkDeadlock = async () => {
+      if (!currentLevel || gameState !== 'playing' || isProcessing || !grid || grid.length === 0) return;
+
+      // 防止刷新过快（至少间隔2秒）
+      const now = Date.now();
+      if (now - lastRefreshTime < 2000) return;
+
+      const hint = findHint(grid, currentLevel);
+      if (!hint && moves < currentLevel.maxMoves && moves > 0) {
+        // 没有可消除的对，自动刷新网格
+        setLastRefreshTime(now);
+        setIsProcessing(true);
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const refreshedGrid = refreshGrid(currentLevel);
+        setGrid(refreshedGrid);
+        setIsProcessing(false);
+      }
+    };
+
+    // 延迟检查，避免在处理过程中触发
+    const timer = setTimeout(checkDeadlock, 100);
+    return () => clearTimeout(timer);
+  }, [grid, currentLevel, gameState, isProcessing, moves, lastRefreshTime]);
 
   // 首页关卡选择界面
   if (gameState === 'menu') {
