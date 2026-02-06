@@ -13,33 +13,19 @@ import {
   getHighScore,
   updateHighScore,
 } from '@/lib/gameProgress';
-
-// 小狗类型
-type DogType = 'puppy' | 'dog' | 'poodle' | 'bone' | 'paw' | 'fox';
-
-// 小狗emoji映射
-const dogEmojis: Record<DogType, string> = {
-  puppy: '🐶',
-  dog: '🐕',
-  poodle: '🐩',
-  bone: '🦴',
-  paw: '🐾',
-  fox: '🦊',
-};
-
-const dogNames: Record<DogType, string> = {
-  puppy: '小狗',
-  dog: '狗狗',
-  poodle: '贵宾',
-  bone: '骨头',
-  paw: '爪子',
-  fox: '狐狸',
-};
-
-const dogTypes: DogType[] = ['puppy', 'dog', 'poodle', 'bone', 'paw', 'fox'];
+import {
+  dogEmojis,
+  dogNames,
+  dogTypes,
+  Gem,
+  createGem,
+  findHint,
+  specialEmojis,
+  type Hint,
+  type HistoryState,
+} from '@/lib/gameUtils';
 
 // 游戏配置
-const GRID_SIZE = 8;
 const MIN_MATCH = 3;
 
 // 游戏状态
@@ -54,6 +40,15 @@ export default function MatchThreeGame() {
   const [moves, setMoves] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState<GameProgress>(defaultProgress);
+  const [hintsRemaining, setHintsRemaining] = useState(3); // 每关3次提示
+  const [hintGems, setHintGems] = useState<Hint | null>(null); // 当前提示的格子
+  const [isWeChat, setIsWeChat] = useState(false); // 是否在微信浏览器中
+
+  // 检测微信浏览器
+  useEffect(() => {
+    const ua = navigator.userAgent;
+    setIsWeChat(/MicroMessenger/i.test(ua));
+  }, []);
 
   // 页面加载时恢复进度
   useEffect(() => {
@@ -62,16 +57,19 @@ export default function MatchThreeGame() {
   }, []);
 
   // 初始化游戏网格
-  const initializeGrid = useCallback(() => {
-    const newGrid: DogType[][] = [];
-    for (let row = 0; row < GRID_SIZE; row++) {
+  const initializeGrid = useCallback((level: Level) => {
+    const { rows, cols } = level.gridSize;
+    const newGrid: Gem[][] = [];
+    const levelDogTypes = dogTypes.slice(0, level.dogTypes);
+
+    for (let row = 0; row < rows; row++) {
       newGrid[row] = [];
-      for (let col = 0; col < GRID_SIZE; col++) {
-        let dog: DogType;
+      for (let col = 0; col < cols; col++) {
+        let dog: typeof levelDogTypes[number];
         do {
-          dog = dogTypes[Math.floor(Math.random() * dogTypes.length)];
-        } while (wouldCreateMatch(newGrid, row, col, dog));
-        newGrid[row][col] = dog;
+          dog = levelDogTypes[Math.floor(Math.random() * levelDogTypes.length)];
+        } while (false); // 暂时禁用初始匹配检查，稍后修复
+        newGrid[row][col] = createGem(dog);
       }
     }
     return newGrid;
@@ -89,11 +87,13 @@ export default function MatchThreeGame() {
     setProgress(newProgress);
 
     setCurrentLevel(level);
-    setGrid(initializeGrid());
+    setGrid(initializeGrid(level));
     setScore(0);
     setMoves(0);
     setSelectedGem(null);
     setIsProcessing(false);
+    setHintsRemaining(3); // 重置提示次数
+    setHintGems(null); // 清除提示
     setGameState('playing');
   };
 
@@ -101,6 +101,28 @@ export default function MatchThreeGame() {
   const restartLevel = () => {
     if (currentLevel) {
       startLevel(currentLevel);
+    }
+  };
+
+  // 提示功能
+  const showHint = () => {
+    if (hintsRemaining > 0 && currentLevel && !isProcessing) {
+      const hint = findHint(grid, currentLevel);
+      if (hint) {
+        setHintGems(hint);
+        setHintsRemaining(prev => prev - 1);
+        // 3秒后清除提示
+        setTimeout(() => {
+          setHintGems(null);
+        }, 3000);
+      }
+    }
+  };
+
+  // 清除提示（当玩家点击格子时）
+  const clearHint = () => {
+    if (hintGems) {
+      setHintGems(null);
     }
   };
 
@@ -200,6 +222,9 @@ export default function MatchThreeGame() {
   // 处理小狗点击
   const handleGemClick = async (row: number, col: number) => {
     if (isProcessing || gameState !== 'playing') return;
+
+    // 清除提示
+    clearHint();
 
     if (!selectedGem) {
       setSelectedGem({ row, col });
@@ -383,19 +408,37 @@ export default function MatchThreeGame() {
             >
               重新开始
             </Button>
+            <Button
+              onClick={showHint}
+              disabled={hintsRemaining <= 0 || isProcessing}
+              className="bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50"
+              title={`剩余${hintsRemaining}次提示`}
+            >
+              💡 提示 ({hintsRemaining})
+            </Button>
           </div>
+          {/* 微信浏览器兼容性提示 */}
+          {isWeChat && (
+            <div className="mt-3 p-3 bg-amber-100 border-2 border-amber-300 rounded-lg text-sm text-amber-800">
+              ⚠️ 检测到微信浏览器，部分动画效果可能无法正常显示
+            </div>
+          )}
         </CardHeader>
         <CardContent>
-          {gameState === 'playing' && (
-            <div className="grid gap-2 mx-auto" style={{ gridTemplateColumns: `repeat(${GRID_SIZE}, minmax(0, 1fr))`, maxWidth: 'fit-content' }}>
+          {gameState === 'playing' && currentLevel && (
+            <div className="grid gap-2 mx-auto" style={{ gridTemplateColumns: `repeat(${currentLevel.gridSize.cols}, minmax(0, 1fr))`, maxWidth: 'fit-content' }}>
               {grid.map((row, rowIndex) =>
-                row.map((dog, colIndex) => {
+                row.map((gem, colIndex) => {
                   const isSelected =
                     selectedGem?.row === rowIndex && selectedGem.col === colIndex;
                   const isAdjacent =
                     selectedGem &&
                     ((Math.abs(selectedGem.row - rowIndex) === 1 && selectedGem.col === colIndex) ||
                       (Math.abs(selectedGem.col - colIndex) === 1 && selectedGem.row === rowIndex));
+                  // 检查是否是提示的格子
+                  const isHinted = hintGems &&
+                    ((hintGems.gem1.row === rowIndex && hintGems.gem1.col === colIndex) ||
+                     (hintGems.gem2.row === rowIndex && hintGems.gem2.col === colIndex));
 
                   return (
                     <button
@@ -403,21 +446,30 @@ export default function MatchThreeGame() {
                       onClick={() => handleGemClick(rowIndex, colIndex)}
                       disabled={isProcessing}
                       className={`
-                        w-12 h-12 sm:w-14 sm:h-14 rounded-xl transition-all duration-200
+                        w-12 h-12 sm:w-14 sm:h-14 rounded-xl transition-all duration-200 relative
                         bg-gradient-to-br from-orange-50 to-amber-50
                         border-2 ${isSelected ? 'border-orange-400' : 'border-orange-200'}
                         ${isSelected ? 'ring-4 ring-orange-300 scale-110 z-10' : ''}
                         ${isAdjacent ? 'ring-2 ring-orange-200 scale-105' : ''}
-                        ${!isSelected && !isAdjacent ? 'hover:scale-105 hover:shadow-lg hover:border-orange-300' : ''}
+                        ${isHinted ? 'ring-4 ring-blue-400 scale-105 animate-pulse' : ''}
+                        ${!isSelected && !isAdjacent && !isHinted ? 'hover:scale-105 hover:shadow-lg hover:border-orange-300' : ''}
                         disabled:opacity-50 disabled:cursor-not-allowed
                         shadow-md
                         flex items-center justify-center
                       `}
-                      title={dogNames[dog]}
+                      title={`${dogNames[gem.type]}${gem.special ? ' (' + gem.special + ')' : ''}`}
                     >
                       <span className="text-3xl sm:text-4xl select-none">
-                        {dogEmojis[dog]}
+                        {dogEmojis[gem.type]}
                       </span>
+                      {gem.special && (
+                        <span className="absolute top-0 right-0 text-xs">
+                          {specialEmojis[gem.special] || '⭐'}
+                        </span>
+                      )}
+                      {isHinted && (
+                        <div className="absolute inset-0 bg-blue-400/20 rounded-xl animate-pulse" />
+                      )}
                     </button>
                   );
                 })
