@@ -34,7 +34,7 @@ type GameState = 'menu' | 'playing' | 'won' | 'lost';
 export default function MatchThreeGame() {
   const [gameState, setGameState] = useState<GameState>('menu');
   const [currentLevel, setCurrentLevel] = useState<Level | null>(null);
-  const [grid, setGrid] = useState<DogType[][]>([]);
+  const [grid, setGrid] = useState<Gem[][]>([]);
   const [selectedGem, setSelectedGem] = useState<{ row: number; col: number } | null>(null);
   const [score, setScore] = useState(0);
   const [moves, setMoves] = useState(0);
@@ -191,13 +191,13 @@ export default function MatchThreeGame() {
   };
 
   // 查找所有匹配
-  const findMatches = useCallback((currentGrid: DogType[][]): Set<string> => {
+  const findMatches = useCallback((currentGrid: Gem[][]): Set<string> => {
     const matches = new Set<string>();
 
     for (let row = 0; row < GRID_SIZE; row++) {
       for (let col = 0; col < GRID_SIZE - 2; col++) {
-        const dog = currentGrid[row][col];
-        if (dog && dog === currentGrid[row][col + 1] && dog === currentGrid[row][col + 2]) {
+        const gem = currentGrid[row][col];
+        if (gem && gem.type === currentGrid[row][col + 1]?.type && gem.type === currentGrid[row][col + 2]?.type) {
           matches.add(`${row},${col}`);
           matches.add(`${row},${col + 1}`);
           matches.add(`${row},${col + 2}`);
@@ -207,8 +207,8 @@ export default function MatchThreeGame() {
 
     for (let row = 0; row < GRID_SIZE - 2; row++) {
       for (let col = 0; col < GRID_SIZE; col++) {
-        const dog = currentGrid[row][col];
-        if (dog && dog === currentGrid[row + 1][col] && dog === currentGrid[row + 2][col]) {
+        const gem = currentGrid[row][col];
+        if (gem && gem.type === currentGrid[row + 1]?.[col]?.type && gem.type === currentGrid[row + 2]?.[col]?.type) {
           matches.add(`${row},${col}`);
           matches.add(`${row + 1},${col}`);
           matches.add(`${row + 2},${col}`);
@@ -269,7 +269,7 @@ export default function MatchThreeGame() {
   };
 
   // 处理匹配消除
-  const processMatches = async (currentGrid: DogType[][]): Promise<void> => {
+  const processMatches = async (currentGrid: Gem[][]): Promise<void> => {
     let workingGrid = currentGrid.map(r => [...r]);
     let hasMatches = true;
     let roundMatches = findMatches(workingGrid);
@@ -297,10 +297,14 @@ export default function MatchThreeGame() {
         }
       }
 
+      // 根据当前关卡生成新萌宠
+      const levelDogTypes = currentLevel ? dogTypes.slice(0, currentLevel.dogTypes) : dogTypes;
+
       for (let col = 0; col < GRID_SIZE; col++) {
         for (let row = 0; row < GRID_SIZE; row++) {
           if (workingGrid[row][col] === null) {
-            workingGrid[row][col] = dogTypes[Math.floor(Math.random() * dogTypes.length)];
+            const randomType = levelDogTypes[Math.floor(Math.random() * levelDogTypes.length)];
+            workingGrid[row][col] = createGem(randomType);
           }
         }
       }
