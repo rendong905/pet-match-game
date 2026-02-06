@@ -27,6 +27,7 @@ import {
 
 // 游戏配置
 const MIN_MATCH = 3;
+const GRID_SIZE = 8; // 默认8x8网格
 
 // 游戏状态
 type GameState = 'menu' | 'playing' | 'won' | 'lost';
