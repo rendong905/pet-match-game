@@ -210,3 +210,43 @@ export const getRocketExplosion = (row: number, col: number, rows: number, cols:
   }
   return explosions;
 };
+
+// 处理特殊道具爆炸
+export const handleSpecialExplosions = (grid: Gem[][], matches: Set<string>, rows: number, cols: number): Set<string> => {
+  const allExplosions = new Set<string>(matches);
+
+  for (const matchKey of matches) {
+    const [row, col] = matchKey.split(',').map(Number);
+    const gem = grid[row][col];
+
+    if (gem && gem.special) {
+      switch (gem.special) {
+        case 'bomb':
+          const bombExplosions = getBombExplosion(row, col, rows, cols);
+          bombExplosions.forEach(pos => allExplosions.add(pos));
+          break;
+        case 'rainbow':
+          // 彩虹消除所有相邻的同色
+          const adjacentPositions = [
+            [row - 1, col],
+            [row + 1, col],
+            [row, col - 1],
+            [row, col + 1],
+          ];
+          for (const [r, c] of adjacentPositions) {
+            if (r >= 0 && r < rows && c >= 0 && c < cols && grid[r][c]) {
+              const rainbowExplosions = getRainbowExplosion(grid, grid[r][c].type, rows, cols);
+              rainbowExplosions.forEach(pos => allExplosions.add(pos));
+            }
+          }
+          break;
+        case 'rocket':
+          const rocketExplosions = getRocketExplosion(row, col, rows, cols);
+          rocketExplosions.forEach(pos => allExplosions.add(pos));
+          break;
+      }
+    }
+  }
+
+  return allExplosions;
+};

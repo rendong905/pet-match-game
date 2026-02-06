@@ -19,8 +19,11 @@ import {
   dogTypes,
   Gem,
   createGem,
+  createSpecialGem,
   findHint,
   specialEmojis,
+  detectSpecial,
+  handleSpecialExplosions,
   type Hint,
   type HistoryState,
 } from '@/lib/gameUtils';
@@ -340,12 +343,46 @@ export default function MatchThreeGame() {
     let roundMatches = findMatches(workingGrid);
 
     while (hasMatches) {
-      roundMatches.forEach(key => {
-        const [row, col] = key.split(',').map(Number);
-        workingGrid[row][col] = null as any;
-      });
+      // 检测特殊道具
+      const special = detectSpecial(roundMatches, GRID_SIZE, GRID_SIZE);
+
+      // 处理特殊道具爆炸
+      if (special) {
+        const explosions = handleSpecialExplosions(workingGrid, roundMatches, GRID_SIZE, GRID_SIZE);
+        explosions.forEach(key => {
+          const [row, col] = key.split(',').map(Number);
+          workingGrid[row][col] = null as any;
+        });
+      } else {
+        // 普通消除
+        roundMatches.forEach(key => {
+          const [row, col] = key.split(',').map(Number);
+          workingGrid[row][col] = null as any;
+        });
+      }
 
       setScore(prev => prev + roundMatches.size * 10);
+
+      // 生成特殊道具（在消除后）
+      if (special && workingGrid[special.position.row][special.position.col] === null) {
+        // 获取匹配的类型
+        const matchKey = Array.from(roundMatches)[0];
+        const [matchRow, matchCol] = matchKey.split(',').map(Number);
+        // 找到一个相邻的非null格子来获取类型
+        let targetType = workingGrid[special.position.row]?.[special.position.col]?.type;
+        if (!targetType) {
+          for (const key of roundMatches) {
+            const [r, c] = key.split(',').map(Number);
+            if (workingGrid[r][c]) {
+              targetType = workingGrid[r][c].type;
+              break;
+            }
+          }
+        }
+        if (targetType) {
+          workingGrid[special.position.row][special.position.col] = createSpecialGem(targetType, special.special);
+        }
+      }
 
       await new Promise(resolve => setTimeout(resolve, 300));
 
@@ -400,7 +437,7 @@ export default function MatchThreeGame() {
             <p className="text-sm text-orange-500 mt-1">通关上一关解锁下一关</p>
           </CardHeader>
           <CardContent className="px-8 pb-8">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
+            <div className="grid grid-cols-5 gap-5">
               {levels.map((level) => {
                 const unlocked = isLevelUnlocked(level.id, progress);
                 const highScore = getHighScore(level.id, progress);
