@@ -45,6 +45,7 @@ export default function MatchThreeGame() {
   const [hintGems, setHintGems] = useState<Hint | null>(null); // 当前提示的格子
   const [isWeChat, setIsWeChat] = useState(false); // 是否在微信浏览器中
   const [targetReached, setTargetReached] = useState(false); // 是否已达到目标分数
+  const [isAutoPlaying, setIsAutoPlaying] = useState(false); // 是否正在自动消除
 
   // 检测微信浏览器
   useEffect(() => {
@@ -187,6 +188,51 @@ export default function MatchThreeGame() {
       }
     }
   }, [currentLevel, score, moves, gameState, progress, targetReached]);
+
+  // 自动消除逻辑（达到目标后自动继续消除）
+  useEffect(() => {
+    const autoPlay = async () => {
+      if (!currentLevel || gameState !== 'playing' || !targetReached || isAutoPlaying || isProcessing || moves >= currentLevel.maxMoves) {
+        return;
+      }
+
+      setIsAutoPlaying(true);
+
+      while (moves < currentLevel.maxMoves && gameState === 'playing') {
+        // 查找可消除的对
+        const hint = findHint(grid, currentLevel);
+
+        if (!hint) {
+          // 没有可消除的，退出
+          break;
+        }
+
+        // 模拟交换
+        const { gem1, gem2 } = hint;
+        const newGrid = grid.map(r => [...r]);
+        const temp = newGrid[gem1.row][gem1.col];
+        newGrid[gem1.row][gem1.col] = newGrid[gem2.row][gem2.col];
+        newGrid[gem2.row][gem2.col] = temp;
+
+        // 检查是否有匹配
+        const matches = findMatches(newGrid);
+
+        if (matches.size > 0) {
+          setGrid(newGrid);
+          setMoves(prev => prev + 1);
+          await processMatches(newGrid);
+          // 等待一段时间再进行下一次交换
+          await new Promise(resolve => setTimeout(resolve, 500));
+        } else {
+          break;
+        }
+      }
+
+      setIsAutoPlaying(false);
+    };
+
+    autoPlay();
+  }, [targetReached, moves, gameState, currentLevel, isProcessing, isAutoPlaying, grid]);
 
   // 检查放置小狗是否会创建初始匹配
   const wouldCreateMatch = (
@@ -347,40 +393,40 @@ export default function MatchThreeGame() {
       <div className="min-h-screen bg-gradient-to-br from-amber-100 via-orange-100 to-yellow-100 p-4 py-8">
         <Card className="w-full max-w-4xl mx-auto bg-white/80 backdrop-blur-lg border-orange-200 shadow-2xl">
           <CardHeader className="text-center pb-6">
-            <CardTitle className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-amber-500 mb-4">
+            <CardTitle className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-amber-500 mb-2">
               🐕 萌宠消消乐 🐾
             </CardTitle>
-            <p className="text-lg text-orange-700">选择关卡开始游戏</p>
+            <p className="text-lg text-orange-700 font-semibold">选择关卡开始游戏</p>
+            <p className="text-sm text-orange-500 mt-1">通关上一关解锁下一关</p>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+          <CardContent className="px-8 pb-8">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
               {levels.map((level) => {
                 const unlocked = isLevelUnlocked(level.id, progress);
                 const highScore = getHighScore(level.id, progress);
 
                 return (
-                  <Button
-                    key={level.id}
-                    onClick={() => unlocked && startLevel(level)}
-                    disabled={!unlocked}
-                    className={`h-28 flex flex-col items-center justify-center border-2 transition-all duration-200 overflow-hidden ${
-                      unlocked
-                        ? 'bg-gradient-to-br from-orange-100 to-amber-100 hover:from-orange-200 hover:to-amber-200 text-orange-700 border-orange-300 hover:border-orange-400 cursor-pointer'
-                        : 'bg-gray-100 text-gray-400 border-gray-300 cursor-not-allowed'
-                    }`}
-                  >
-                    <span className="text-3xl mb-1">{unlocked ? '🐾' : '🔒'}</span>
-                    <span className="text-base font-bold">第 {level.id} 关</span>
-                    <span className="text-xs text-orange-600 mt-0.5">{level.targetScore}分</span>
-                    {highScore > 0 && (
-                      <span className="text-xs text-orange-500 mt-0.5">最高: {highScore}</span>
-                    )}
+                  <div key={level.id} className="relative">
+                    <Button
+                      onClick={() => unlocked && startLevel(level)}
+                      disabled={!unlocked}
+                      className={`w-full h-32 flex flex-col items-center justify-center border-2 transition-all duration-300 ${
+                        unlocked
+                          ? 'bg-gradient-to-br from-orange-50 to-amber-50 hover:from-orange-100 hover:to-amber-100 text-orange-700 border-orange-300 hover:border-orange-400 hover:scale-105 hover:shadow-lg cursor-pointer'
+                          : 'bg-gray-50 text-gray-400 border-gray-300 cursor-not-allowed'
+                      }`}
+                    >
+                      <span className="text-4xl mb-2 drop-shadow-sm">{unlocked ? '🐾' : '🔒'}</span>
+                      <span className="text-lg font-bold mb-1">第 {level.id} 关</span>
+                      <span className="text-xs text-orange-600 font-medium">{level.targetScore}分</span>
+                      {highScore > 0 && (
+                        <span className="text-xs text-orange-500 mt-1">⭐ {highScore}</span>
+                      )}
+                    </Button>
                     {!unlocked && (
-                      <span className="text-xs text-gray-400 mt-0.5">
-                        通关第{level.id - 1}关解锁
-                      </span>
+                      <div className="absolute inset-0 bg-black/10 rounded-lg pointer-events-none" />
                     )}
-                  </Button>
+                  </div>
                 );
               })}
             </div>
