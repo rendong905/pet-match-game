@@ -10,6 +10,7 @@ export interface Level {
   };
   description: string;  // 关卡描述
   difficulty: number;   // 难度星级（1-5）
+  dogTypes: number;     // 萌宠种类数量（3-6）
 }
 
 // 20个关卡配置
@@ -22,7 +23,8 @@ export const levels: Level[] = [
     maxMoves: 15,
     gridSize: { rows: 8, cols: 8 },
     description: "新手关卡，熟悉游戏规则",
-    difficulty: 1
+    difficulty: 1,
+    dogTypes: 3
   },
   {
     id: 2,
@@ -31,7 +33,8 @@ export const levels: Level[] = [
     maxMoves: 15,
     gridSize: { rows: 8, cols: 8 },
     description: "提高难度，挑战更高分数",
-    difficulty: 2
+    difficulty: 2,
+    dogTypes: 3
   },
   {
     id: 3,
@@ -40,7 +43,8 @@ export const levels: Level[] = [
     maxMoves: 14,
     gridSize: { rows: 8, cols: 8 },
     description: "步数减少，需要更精准的操作",
-    difficulty: 2
+    difficulty: 2,
+    dogTypes: 4
   },
   {
     id: 4,
@@ -49,7 +53,8 @@ export const levels: Level[] = [
     maxMoves: 16,  // 增加2步
     gridSize: { rows: 8, cols: 8 },
     description: "轻松的关卡，享受消除的乐趣",
-    difficulty: 2  // 从3降到2
+    difficulty: 2,  // 从3降到2
+    dogTypes: 4
   },
   {
     id: 5,
@@ -58,7 +63,8 @@ export const levels: Level[] = [
     maxMoves: 13,
     gridSize: { rows: 8, cols: 8 },
     description: "挑战高分，展现你的实力",
-    difficulty: 3
+    difficulty: 3,
+    dogTypes: 4
   },
 
   // === 进阶阶段（6-10关）===
@@ -69,7 +75,8 @@ export const levels: Level[] = [
     maxMoves: 13,
     gridSize: { rows: 8, cols: 8 },
     description: "步数紧张，策略至上",
-    difficulty: 3
+    difficulty: 3,
+    dogTypes: 4
   },
   {
     id: 7,
@@ -78,7 +85,8 @@ export const levels: Level[] = [
     maxMoves: 12,
     gridSize: { rows: 8, cols: 8 },
     description: "节奏加快，反应要快",
-    difficulty: 3
+    difficulty: 3,
+    dogTypes: 4
   },
   {
     id: 8,
@@ -87,7 +95,8 @@ export const levels: Level[] = [
     maxMoves: 14,  // 增加2步
     gridSize: { rows: 8, cols: 8 },
     description: "放轻松，享受消除的快感",
-    difficulty: 3  // 从4降到3
+    difficulty: 3,  // 从4降到3
+    dogTypes: 4
   },
   {
     id: 9,
@@ -96,7 +105,8 @@ export const levels: Level[] = [
     maxMoves: 13,  // 从11降到13
     gridSize: { rows: 8, cols: 8 },
     description: "接近完美，证明你的实力",
-    difficulty: 4  // 从5降到4
+    difficulty: 4,  // 从5降到4
+    dogTypes: 5
   },
   {
     id: 10,
@@ -105,7 +115,8 @@ export const levels: Level[] = [
     maxMoves: 12,  // 从10降到12
     gridSize: { rows: 8, cols: 8 },
     description: "第一阶段的终极挑战",
-    difficulty: 4  // 从5降到4
+    difficulty: 4,  // 从5降到4
+    dogTypes: 5
   },
 
   // === 中等难度阶段（11-15关）===
@@ -116,7 +127,8 @@ export const levels: Level[] = [
     maxMoves: 12,
     gridSize: { rows: 8, cols: 8 },
     description: "开启新的冒险旅程",
-    difficulty: 4
+    difficulty: 4,
+    dogTypes: 5
   },
   {
     id: 12,
@@ -125,7 +137,8 @@ export const levels: Level[] = [
     maxMoves: 12,
     gridSize: { rows: 8, cols: 8 },
     description: "在萌宠王国中探索",
-    difficulty: 4
+    difficulty: 4,
+    dogTypes: 5
   },
   {
     id: 13,
@@ -134,7 +147,8 @@ export const levels: Level[] = [
     maxMoves: 14,
     gridSize: { rows: 8, cols: 8 },
     description: "在城堡中放松心情",
-    difficulty: 3
+    difficulty: 3,
+    dogTypes: 4
   },
   {
     id: 14,
@@ -143,7 +157,8 @@ export const levels: Level[] = [
     maxMoves: 11,
     gridSize: { rows: 8, cols: 8 },
     description: "海边的美景与挑战",
-    difficulty: 4
+    difficulty: 4,
+    dogTypes: 5
   },
   {
     id: 15,
@@ -152,7 +167,8 @@ export const levels: Level[] = [
     maxMoves: 11,
     gridSize: { rows: 8, cols: 8 },
     description: "在云端挑战自我",
-    difficulty: 4
+    difficulty: 4,
+    dogTypes: 5
   },
 
   // === 高难度阶段（16-20关，引入不同网格形状）===
@@ -163,7 +179,8 @@ export const levels: Level[] = [
     maxMoves: 11,
     gridSize: { rows: 7, cols: 9 },
     description: "迷宫般的挑战",
-    difficulty: 4
+    difficulty: 4,
+    dogTypes: 5
   },
   {
     id: 17,
@@ -172,7 +189,8 @@ export const levels: Level[] = [
     maxMoves: 13,
     gridSize: { rows: 9, cols: 7 },
     description: "登顶前的休憩",
-    difficulty: 3
+    difficulty: 3,
+    dogTypes: 4
   },
   {
     id: 18,
@@ -181,7 +199,8 @@ export const levels: Level[] = [
     maxMoves: 10,
     gridSize: { rows: 6, cols: 10 },
     description: "深渊的试炼",
-    difficulty: 4
+    difficulty: 4,
+    dogTypes: 5
   },
   {
     id: 19,
@@ -190,7 +209,8 @@ export const levels: Level[] = [
     maxMoves: 10,
     gridSize: { rows: 10, cols: 6 },
     description: "迈向巅峰的挑战",
-    difficulty: 4
+    difficulty: 4,
+    dogTypes: 5
   },
   {
     id: 20,
@@ -199,7 +219,8 @@ export const levels: Level[] = [
     maxMoves: 10,
     gridSize: { rows: 8, cols: 8 },
     description: "真正的萌宠大师",
-    difficulty: 4
+    difficulty: 4,
+    dogTypes: 5
   }
 ];
 

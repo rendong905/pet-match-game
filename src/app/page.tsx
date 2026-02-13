@@ -26,6 +26,7 @@ import {
   handleSpecialExplosions,
   type Hint,
   type HistoryState,
+  type DogType,
 } from '@/lib/gameUtils';
 
 // 游戏配置
